@@ -9,9 +9,9 @@ const GIFTS = [
   { title: 'Abasteça nossa adega',             category: 'Lua de mel',   price: 50,  image: 'assets/presente-adega.webp' },
   { title: 'Café da manhã bonito',             category: 'Lua de mel',   price: 100, image: 'assets/presente-cafe.webp' },
   { title: 'Jantar à luz de velas',            category: 'Lua de mel',   price: 200, image: 'assets/presente-jantar.webp' },
-  { title: 'Prioridade no quarto de hóspedes', category: 'Brincadeiras', price: 250, image: 'assets/presente-quarto.webp' }
+  { title: 'Prioridade no quarto de hóspedes', category: 'Brincadeiras', price: 250, image: 'assets/presente-quarto.webp' },
+  { title: 'SPA para as noivas', category: 'Carinho para as noivas', price: 400, image: 'assets/spa.webp', paymentUrl: 'https://pag.ae/82i6XhqVp' }
 ];
-const MAX_CHEAP_PRICE = 150;
 
 /* ========== Utilidades ========== */
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -66,22 +66,10 @@ function setupMenu() {
 }
 
 /* ========== Presentes ========== */
-function renderGifts(filter = 'Todos') {
+function renderGifts() {
   const root = $('#gift-grid');
   root.replaceChildren();
-
-  const visible = GIFTS.filter(g => {
-    if (filter === 'Todos') return true;
-    if (filter === 'price') return g.price <= MAX_CHEAP_PRICE;
-    return g.category === filter;
-  });
-
-  if (!visible.length) {
-    root.innerHTML = '<p class="empty">Nenhum presente nesta categoria.</p>';
-    return;
-  }
-
-  visible.forEach(gift => {
+  GIFTS.forEach(gift => {
     const card = document.createElement('article');
     card.className = 'gift';
     card.innerHTML = `
@@ -90,11 +78,14 @@ function renderGifts(filter = 'Todos') {
         <small>${gift.category}</small>
         <h3>${gift.title}</h3>
         <div class="gift-bottom">
-          <span>A partir de ${brl(gift.price)}</span>
-          <button class="btn" type="button">Presentear ↗</button>
+          <span>${gift.paymentUrl ? brl(gift.price) : `A partir de ${brl(gift.price)}`}</span>
+          ${gift.paymentUrl
+            ? `<a class="btn" href="${gift.paymentUrl}" target="_blank" rel="noopener noreferrer">Presentear ↗</a>`
+            : '<button class="btn" type="button">Presentear ↗</button>'}
         </div>
       </div>`;
-    $('button', card).onclick = () => openGift(gift);
+    const action = $('button, a', card);
+    if (action.tagName === 'BUTTON') action.onclick = () => openGift(gift);
     root.append(card);
   });
 }
@@ -133,14 +124,6 @@ function updatePixInstruction() {
 
 function setupGifts() {
   renderGifts();
-
-  $$('.chip').forEach(chip => {
-    chip.onclick = () => {
-      $('.chip.active').classList.remove('active');
-      chip.classList.add('active');
-      renderGifts(chip.dataset.filter);
-    };
-  });
 
   $('#free-gift').onclick = () => openGift({ title: 'Um presente de valor livre', price: null });
   $('#gift-amount').oninput = updatePixInstruction;
@@ -186,32 +169,41 @@ const SUBMIT_LABELS = {
 };
 
 function setupForms() {
-  const home = location.origin + '/';
-  const thanks = location.origin + '/obrigada.html';
-
   Object.keys(SUBMIT_LABELS).forEach(id => {
     const form = document.getElementById(id);
     const button = $('button', form);
-
-    const urlField = form.elements['_url'];
-    const nextField = form.elements['_next'];
-    if (location.protocol.startsWith('http')) {
-      if (urlField) urlField.value = home;
-      if (nextField) nextField.value = thanks;
-    }
-
-    form.addEventListener('submit', () => {
+    const feedback = $('.form-feedback', form);
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (feedback) {
+        feedback.hidden = true;
+        feedback.textContent = '';
+      }
       button.disabled = true;
       button.textContent = 'Enviando…';
-    });
-  });
-
-  // Ao voltar pelo histórico do navegador, restaura os botões
-  window.addEventListener('pageshow', () => {
-    Object.entries(SUBMIT_LABELS).forEach(([id, label]) => {
-      const button = $('button', document.getElementById(id));
-      button.disabled = false;
-      button.textContent = label;
+      try {
+        const response = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent('rafaetham@gmail.com')}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(Object.fromEntries(new FormData(form)))
+        });
+        const result = await response.json();
+        if (!response.ok || ![true, 'true'].includes(result.success)) throw new Error('Formulário não aceito');
+        const message = id === 'rsvp-form'
+          ? 'Confirmação enviada com sucesso. Obrigadas pelo carinho!'
+          : 'Recado enviado com sucesso. Obrigadas pelo carinho!';
+        if (feedback) feedback.textContent = message;
+        form.reset();
+        toast(message);
+      } catch {
+        const message = 'Não foi possível enviar agora. Verifique sua conexão e tente novamente.';
+        if (feedback) feedback.textContent = message;
+        toast(message);
+      } finally {
+        if (feedback) feedback.hidden = false;
+        button.disabled = false;
+        button.textContent = SUBMIT_LABELS[id];
+      }
     });
   });
 }
