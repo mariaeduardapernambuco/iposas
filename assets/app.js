@@ -10,7 +10,12 @@ const GIFTS = [
   { title: 'Café da manhã bonito',             category: 'Lua de mel',   price: 100, image: 'assets/presente-cafe.webp' },
   { title: 'Jantar à luz de velas',            category: 'Lua de mel',   price: 200, image: 'assets/presente-jantar.webp' },
   { title: 'Prioridade no quarto de hóspedes', category: 'Brincadeiras', price: 250, image: 'assets/presente-quarto.webp' },
-  { title: 'SPA para as noivas', category: 'Carinho para as noivas', price: 400, image: 'assets/spa.webp', paymentUrl: 'https://pag.ae/82i6XhqVp' }
+  { title: 'SPA para as noivas', category: 'Carinho para as noivas', price: 400, image: 'assets/spa.webp', cardLinks: [{ label: 'R$ 400 ↗', url: 'https://pag.ae/82i6XhqVp' }] }
+];
+const DEFAULT_CARD_LINKS = [
+  { label: 'R$ 50 ↗', url: 'https://pag.ae/82hdM58jp' },
+  { label: 'R$ 100 ↗', url: 'https://pag.ae/82hdWCx7J' },
+  { label: 'R$ 200 ↗', url: 'https://pag.ae/82he6LjQp' }
 ];
 
 /* ========== Utilidades ========== */
@@ -78,14 +83,11 @@ function renderGifts() {
         <small>${gift.category}</small>
         <h3>${gift.title}</h3>
         <div class="gift-bottom">
-          <span>${gift.paymentUrl ? brl(gift.price) : `A partir de ${brl(gift.price)}`}</span>
-          ${gift.paymentUrl
-            ? `<a class="btn" href="${gift.paymentUrl}" target="_blank" rel="noopener noreferrer">Presentear ↗</a>`
-            : '<button class="btn" type="button">Presentear ↗</button>'}
+          <span>${`A partir de ${brl(gift.price)}`}</span>
+          <button class="btn" type="button">Presentear ↗</button>
         </div>
       </div>`;
-    const action = $('button, a', card);
-    if (action.tagName === 'BUTTON') action.onclick = () => openGift(gift);
+    $('button', card).onclick = () => openGift(gift);
     root.append(card);
   });
 }
@@ -102,6 +104,18 @@ function openGift(gift) {
   amount.min = minimum;
   amount.value = gift.price || '';
   amount.placeholder = brl(minimum);
+
+  const cardLinks = gift.cardLinks || DEFAULT_CARD_LINKS;
+  const cardLinkRoot = $('.card-links');
+  cardLinkRoot.replaceChildren(...cardLinks.map(link => {
+    const anchor = document.createElement('a');
+    anchor.className = 'btn outline';
+    anchor.href = link.url;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener noreferrer';
+    anchor.textContent = link.label;
+    return anchor;
+  }));
 
   const choices = [minimum, minimum + 50, minimum + 100, minimum + 200];
   $$('[data-amount]').forEach((button, i) => {
