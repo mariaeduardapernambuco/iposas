@@ -179,7 +179,6 @@ function setupDialogs() {
 /* ========== Formulários (FormSubmit) ========== */
 const FORM_EMAIL = 'rafaetham@gmail.com';
 const SUBMIT_LABELS = {
-  'rsvp-form': 'Enviar confirmação ↗',
   'guest-form': 'Deixar meu recado ♡'
 };
 
@@ -187,7 +186,6 @@ function formPayload(form) {
   const data = Object.fromEntries(new FormData(form));
   if ((data._honey || '').trim()) return { spam: true };
   delete data._honey;
-  data._captcha = 'false';
   data._url = `${location.origin}/`;
   data._next = `${location.origin}/obrigada.html`;
   return data;
