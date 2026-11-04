@@ -177,10 +177,35 @@ function setupDialogs() {
 }
 
 /* ========== Formulários (FormSubmit) ========== */
+const FORM_EMAIL = 'rafaetham@gmail.com';
 const SUBMIT_LABELS = {
   'rsvp-form': 'Enviar confirmação ↗',
   'guest-form': 'Deixar meu recado ♡'
 };
+
+function formPayload(form) {
+  const data = Object.fromEntries(new FormData(form));
+  if ((data._honey || '').trim()) return { spam: true };
+  delete data._honey;
+  data._captcha = 'false';
+  data._url = `${location.origin}/`;
+  data._next = `${location.origin}/obrigada.html`;
+  return data;
+}
+
+function mailtoFallback(form) {
+  const data = Object.fromEntries(new FormData(form));
+  const subject = data._subject || 'Formulário — Rafaela & Thamires';
+  const presence = data.attend === 'sim' ? 'Sim, vou' : data.attend === 'nao' ? 'Não poderei ir' : '';
+  const lines = [
+    data.name || data.Nome ? `Nome: ${data.name || data.Nome}` : '',
+    data.phone ? `Telefone: ${data.phone}` : '',
+    presence ? `Presença: ${presence}` : '',
+    data.Mensagem ? `Mensagem:\n${data.Mensagem}` : ''
+  ].filter(Boolean);
+  const href = `mailto:${FORM_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`;
+  window.location.href = href;
+}
 
 function setupForms() {
   Object.keys(SUBMIT_LABELS).forEach(id => {
@@ -193,16 +218,35 @@ function setupForms() {
         feedback.hidden = true;
         feedback.textContent = '';
       }
+      const payload = formPayload(form);
+      if (payload.spam) {
+        const message = id === 'rsvp-form'
+          ? 'Confirmação enviada com sucesso. Obrigadas pelo carinho!'
+          : 'Recado enviado com sucesso. Obrigadas pelo carinho!';
+        if (feedback) {
+          feedback.textContent = message;
+          feedback.hidden = false;
+        }
+        form.reset();
+        toast(message);
+        return;
+      }
       button.disabled = true;
       button.textContent = 'Enviando…';
       try {
-        const response = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent('rafaetham@gmail.com')}`, {
+        const response = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(FORM_EMAIL)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify(Object.fromEntries(new FormData(form)))
+          body: JSON.stringify(payload)
         });
-        const result = await response.json();
-        if (!response.ok || ![true, 'true'].includes(result.success)) throw new Error('Formulário não aceito');
+        const text = await response.text();
+        let result = {};
+        try { result = JSON.parse(text); } catch {
+          throw new Error('serviço indisponível');
+        }
+        if (!response.ok || String(result.success) !== 'true') {
+          throw new Error(result.message || 'serviço indisponível');
+        }
         const message = id === 'rsvp-form'
           ? 'Confirmação enviada com sucesso. Obrigadas pelo carinho!'
           : 'Recado enviado com sucesso. Obrigadas pelo carinho!';
@@ -210,7 +254,8 @@ function setupForms() {
         form.reset();
         toast(message);
       } catch {
-        const message = 'Não foi possível enviar agora. Verifique sua conexão e tente novamente.';
+        mailtoFallback(form);
+        const message = 'O envio automático está indisponível no momento. Conclua pelo seu e-mail, que já abrimos para você.';
         if (feedback) feedback.textContent = message;
         toast(message);
       } finally {
